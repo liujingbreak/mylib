@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project name="build" default="compile" basedir=".">
+  <property name="componet_name" value="mylib" />
+	<property environment="env" />
+	<!-- passed from file outside -->
+	<property name="dest_dir" value="${basedir}/build/${componet_name}"/>
+	<property name="src_dir" value="${basedir}/src"/>
+	<property name="lib_dir" value="${basedir}/"/>
+	<path id="compile_cp">
+		<fileset dir="${lib_dir}" includes="*.jar" excludes="${dest_jar}"/>
+	</path>
+	<property name="dest_jar" value="${basedir}/build/${componet_name}.jar"/>
+	<property name="keystore" value="${basedir}/mykeystore"/>
+	<property name="signed_jar" value="${basedir}/build/${componet_name}_signed.jar" />
+
+	<property name="compile_excludes" value="none"/>
+
+
+	<!-- test related start -->
+
+	<property name="test_src_dir" value="${basedir}/testsrc"/>
+	<property name="test_res_dir" value="${basedir}/testres"/>
+	<property name="test_dest_dir" value="${basedir}/build/test${componet_name}"/>
+	<property name="test_lib_dir" value="${basedir}/"/>
+	<property name="junit_report_dir" value="${test_dest_dir}/test-report"/>
+	<path id="test_compile_cp">
+		<pathelement location="${dest_dir}"/>
+		<fileset dir="${lib_dir}" includes="*.jar" excludes="${dest_jar}"/>
+		<fileset dir="${test_lib_dir}" includes="*.jar"/>
+	</path>
+	<path id="test_run_cp">
+		<path refid="test_compile_cp"/>
+		<pathelement location="${test_dest_dir}"/>
+	</path>
+	<!-- test related end -->
+
+	<target name="deploy" description="copy to deploy directory">
+		<copy todir="${basedir}/../jeditplugin/lib">
+			<fileset file="${dest_jar}"/>
+		</copy>
+		<copy todir="${basedir}/../filesync/lib">
+			<fileset file="${dest_jar}"/>
+		</copy>
+		<copy todir="${basedir}/../magdownload/lib">
+			<fileset file="${dest_jar}"/>
+		</copy>
+	</target>
+
+	<target name="deploy4Jedit" description="copy to deploy jedit directory">
+	    <copy todir="c:/Program Files/jEdit/jars">
+			<fileset file="${dest_jar}"/>
+		</copy>
+	</target>
+
+	<target name="clean" description="Delete old build and dist directories">
+		<delete dir="${dest_dir}"/>
+		<delete dir="${test_dest_dir}"/>
+    </target>
+
+	<target name="copyRes" >
+		<mkdir dir="${dest_dir}"/>
+		<mkdir dir="${test_dest_dir}"/>
+		<copy todir="${dest_dir}"  includeEmptyDirs="no">
+			<fileset dir="${src_dir}">
+	      		<exclude name="**/*.java"/>
+	      		<exclude name="**/*.jj"/>
+			</fileset>
+		</copy>
+	</target>
+
+	<target name="javacc" depends="copyRes">
+	<!--<javacc
+		target="${src_dir}/org/liujing/JFunctionParser.jj"
+		outputdirectory="${src_dir}/org/liujing"
+		javacchome="D:\myproject\javacc-4.2"
+		static="false"
+	/>-->
+	</target>
+
+	<target name="compile" depends="javacc" description="compile source files">
+		<javac destdir="${dest_dir}" srcdir="${src_dir}"
+			excludes="" debug="on"
+		 fork="yes" memoryMaximumSize="500m">
+			<classpath>
+				 <path refid="compile_cp"/>
+			</classpath>
+			<compilerarg line="-Xlint:deprecation"/><!---->
+		</javac>
+	</target>
+
+	<target name="compile_test" depends="compile"  description="compile test files">
+		<mkdir dir="${test_dest_dir}"/>
+		<copy todir="${test_dest_dir}"  includeEmptyDirs="no">
+			<fileset dir="${test_res_dir}">
+	      		<exclude name="**/*.java"/>
+	      		<exclude name="**/*.jj"/>
+			</fileset>
+		</copy>
+		<javac destdir="${test_dest_dir}" srcdir="${test_src_dir}" debug="on"
+		 fork="yes" memoryMaximumSize="500m">
+			<classpath>
+				 <path refid="test_compile_cp"/>
+			</classpath>
+			<compilerarg line="-Xlint:deprecation"/><!---->
+		</javac>
+	</target>
+
+	<target name="javadoc" >
+		<javadoc destdir="${src_dir}/../api"
+			author="true"
+			version="true"
+			use="true"
+			windowtitle="${componet_name} API" >
+			<fileset dir="${src_dir}">
+			    <include>**/*.java</include>
+			</fileset>
+		</javadoc>
+	</target>
+	<!-- pack jar file -->
+	<target name="pack_with_mf"  if="MANIFEST.MF_exist">
+		<echo>pack ${dest_jar} with defined MANIFEST.MF</echo>
+		<jar destfile="${dest_jar}" basedir="${dest_dir}" manifest="${dest_dir}/META-INF/MANIFEST.MF"
+			>
+			<!--<metainf dir="${dest_dir}/META-INF" excludes="MANIFEST.MF"/>-->
+		</jar>
+	</target>
+
+	<target name="pack_without_mf" unless="MANIFEST.MF_exist">
+		<echo>pack ${dest_jar} without MANIFEST.MF</echo>
+		<jar destfile="${dest_jar}" basedir="${dest_dir}">
+			<!--<metainf dir="${dest_dir}/META-INF" excludes="MANIFEST.MF"/>-->
+		</jar>
+	</target>
+
+
+
+	<target name="pack" depends="compile">
+		<echo>=======pack jar file========</echo>
+		<uptodate property="noChangeJar" targetfile="${dest_jar}" >
+	    		<srcfiles dir= "${dest_dir}" excludes="**/*.jar"/>
+	  	</uptodate>
+		<antcall target="packJar" />
+	</target>
+	<target name="packJar" unless="noChangeJar">
+		<echo>need pack Jar file ${dest_jar}</echo>
+		<echo>check exist: ${dest_dir}/META-INF/MANIFEST.MF</echo>
+		<available property="MANIFEST.MF_exist" file="${dest_dir}/META-INF/MANIFEST.MF"/>
+		<echo>${MANIFEST.MF_exist}</echo>
+		<antcall target="pack_with_mf" />
+		<antcall target="pack_without_mf" />
+	</target>
+
+	<target name="sign" depends="pack" description="compile, pack and sign jar file">
+		<signjar jar="${dest_jar}" signedjar="${signed_jar}"
+		keystore="${keystore}" alias="www.liujing.com" storepass="000000" keypass="000000"/>
+	</target>
+
+	<!-- Junit -->
+	<target name="junit" depends="compile_test" description="junit test">
+		<echo>+---------------------------------------------------+</echo>
+		<echo>|                                                   |</echo>
+		<echo>| run Junit                                         |</echo>
+		<echo>|                                                   |</echo>
+		<echo>+---------------------------------------------------+</echo>
+
+		<mkdir  dir="${junit_report_dir}"/>
+		<junit  fork="true" printsummary="on" showoutput="true" dir="${test_dest_dir}">
+			<sysproperty key="java.util.logging.config.file" value="logging.properties"/>
+			<jvmarg value="-agentlib:jdwp=transport=dt_shmem,address=mylib,server=y,suspend=n"/>
+			<classpath>
+				<path refid="test_run_cp"/>
+			</classpath>
+			<formatter type="plain"/>
+			<batchtest todir="${junit_report_dir}">
+				<fileset dir="${test_dest_dir}">
+				 	<include name="**/BackgroundWorkControllerTest.class"/>
+				</fileset>
+			</batchtest>
+		</junit>
+	</target>
+</project>

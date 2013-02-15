@@ -1,0 +1,1 @@
+java -cp build\mylib liujing.persist.FileRecordController %*

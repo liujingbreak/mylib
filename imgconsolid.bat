@@ -1,0 +1,1 @@
+java -cp build\mylib liujing.util.ImageConsolidation %*
