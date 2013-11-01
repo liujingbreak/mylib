@@ -16,7 +16,8 @@ public class ImageDim {
             stream = ImageIO.createImageInputStream(f);
             Iterator iter = ImageIO.getImageReaders(stream);
             if (!iter.hasNext()) {
-                return null;
+                throw new RuntimeException("No image in file "+ f.getPath());
+                //return null;
             }
     
             ImageReader reader = (ImageReader)iter.next();
@@ -25,6 +26,8 @@ public class ImageDim {
             //log.info("getImageMetadata: " + reader.getImageMetadata(0));
             reader.dispose();
             return dim;
+        }catch(Exception ex){
+            throw new RuntimeException("Failed to retrieve image size", ex);
         }finally{
             if(stream != null)
                 stream.close();
